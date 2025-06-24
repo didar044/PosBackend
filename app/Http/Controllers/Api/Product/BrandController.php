@@ -83,5 +83,6 @@ class BrandController extends Controller
     {
         $brand = Brand::find($id);
         $brand->delete();
+        return response()->json(['message' => 'Category deleted successfully']);
     }
 }
