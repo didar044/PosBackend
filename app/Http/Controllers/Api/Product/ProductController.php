@@ -25,7 +25,7 @@ public function store(Request $request)
     $product->name = $request->input('name');
     $product->brand_id = $request->input('brand_id');
     $product->categorie_id = $request->input('categorie_id');
-    $product->supplier_id = $request->input('supplier_id');
+    // $product->supplier_id = $request->input('supplier_id');
     $product->barcode = $request->input('barcode');
     $product->price = $request->input('price');
     $product->discount = $request->input('discount', 0);
@@ -77,7 +77,7 @@ public function update(Request $request, $id)
         'name' => 'required|string|max:255',
         'brand_id' => 'required|integer|exists:brands,id',
         'categorie_id' => 'required|integer|exists:categories,id',
-        'supplier_id' => 'required|integer|exists:suppliers,id',
+        // 'supplier_id' => 'required|integer|exists:suppliers,id',
         'barcode' => 'nullable|string|max:255',
         'price' => 'required|numeric|min:0',
         'discount' => 'nullable|numeric|min:0',
@@ -85,7 +85,8 @@ public function update(Request $request, $id)
         'quantity' => 'required|integer|min:0',
         'status' => 'nullable|in:active,inactive',
         'description' => 'nullable|string',
-        'img' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+        'img' => 'image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+       //'img' => 'required',
     ]);
 
     // Handle image upload if exists

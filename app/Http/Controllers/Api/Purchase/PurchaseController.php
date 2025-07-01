@@ -221,29 +221,38 @@ public function updateStatus(Request $request, $id)
 
     // Update purchase & items, adjust stock accordingly
     public function update(Request $request, $id)
-    {
-        $purchase = Purchase::find($id);
-        if (!$purchase) {
-            return response()->json(['message' => 'Purchase not found'], 404);
-        }
+{
+    \Log::info('Purchase update request data:', $request->all());
 
-        $validated = $request->validate([
-            'supplier_id' => 'required|integer|exists:pos_suppliers,id',
-            'warehouse_id' => 'required|integer|exists:pos_warehouses,id',
-            'purchase_date' => 'required|date',
-            'total_amount' => 'required|numeric|min:0',
-            'paid_amount' => 'nullable|numeric|min:0',
-            'status' => 'nullable|in:pending,completed,cancelled',
-            'items' => 'required|array|min:1',
-            'items.*.product_id' => 'required|integer|exists:pos_products,id',
-            'items.*.quantity' => 'required|integer|min:1',
-            'items.*.unit_price' => 'required|numeric|min:0',
-        ]);
+    $purchase = Purchase::find($id);
+    if (!$purchase) {
+        return response()->json(['message' => 'Purchase not found'], 404);
+    }
 
-        DB::beginTransaction();
+    $validated = $request->validate([
+        'supplier_id' => 'required|integer|exists:suppliers,id',
+        'warehouse_id' => 'required|integer|exists:warehouses,id',
+        'purchase_date' => 'required|date',
+        'total_amount' => 'required|numeric|min:0',
+        'paid_amount' => 'nullable|numeric|min:0',
+        'status' => 'nullable|in:pending,completed,cancelled',
+        'reference' => 'nullable|string|max:100',
+        'description' => 'nullable|string',
+        'items' => 'required|array|min:1',
+        'items.*.product_id' => 'required|integer|exists:products,id',
+        'items.*.quantity' => 'required|numeric|min:0',
+        'items.*.unit_price' => 'required|numeric|min:0',
+        'items.*.discount' => 'nullable|numeric|min:0',
+        'items.*.tax_percent' => 'nullable|numeric|min:0',
+        'items.*.tax_amount' => 'nullable|numeric|min:0',
+        'items.*.subtotal' => 'required|numeric|min:0',
+    ]);
 
-        try {
-            // 1. Reverse old stock quantities (reduce stock for old purchase items)
+    DB::beginTransaction();
+
+    try {
+        // 1. Reverse old stock (if completed previously)
+        if ($purchase->status === 'completed') {
             foreach ($purchase->items as $oldItem) {
                 $stock = Stock::where('product_id', $oldItem->product_id)
                     ->where('warehouse_id', $purchase->warehouse_id)
@@ -251,36 +260,41 @@ public function updateStatus(Request $request, $id)
 
                 if ($stock) {
                     $stock->quantity -= $oldItem->quantity;
-                    if ($stock->quantity < 0) $stock->quantity = 0; // no negative stock
+                    if ($stock->quantity < 0) $stock->quantity = 0;
                     $stock->save();
                 }
             }
+        }
 
-            // 2. Update purchase main data
-            $purchase->update([
-                'supplier_id' => $validated['supplier_id'],
-                'warehouse_id' => $validated['warehouse_id'],
-                'purchase_date' => $validated['purchase_date'],
-                'total_amount' => $validated['total_amount'],
-                'paid_amount' => $validated['paid_amount'] ?? 0,
-                'status' => $validated['status'] ?? 'pending',
+        // 2. Update purchase
+        $purchase->update([
+            'supplier_id' => $validated['supplier_id'],
+            'warehouse_id' => $validated['warehouse_id'],
+            'purchase_date' => $validated['purchase_date'],
+            'total_amount' => $validated['total_amount'],
+            'paid_amount' => $validated['paid_amount'] ?? 0,
+            'status' => $validated['status'] ?? 'pending',
+            'reference' => $validated['reference'] ?? null,
+            'description' => $validated['description'] ?? null,
+        ]);
+
+        // 3. Delete old items
+        $purchase->items()->delete();
+
+        // 4. Insert new items & update stock if status = completed
+        foreach ($validated['items'] as $item) {
+            PurchaseItem::create([
+                'purchase_id' => $purchase->id,
+                'product_id' => $item['product_id'],
+                'quantity' => $item['quantity'],
+                'unit_price' => $item['unit_price'],
+                'discount' => $item['discount'] ?? 0,
+                'tax_percent' => $item['tax_percent'] ?? 0,
+                'tax_amount' => $item['tax_amount'] ?? 0,
+                'subtotal' => $item['subtotal'],
             ]);
 
-            // 3. Delete old purchase items
-            $purchase->items()->delete();
-
-            // 4. Insert new purchase items & update stock
-            foreach ($validated['items'] as $item) {
-                $subtotal = $item['quantity'] * $item['unit_price'];
-
-                PurchaseItem::create([
-                    'purchase_id' => $purchase->id,
-                    'product_id' => $item['product_id'],
-                    'quantity' => $item['quantity'],
-                    'unit_price' => $item['unit_price'],
-                    'subtotal' => $subtotal,
-                ]);
-
+            if ($purchase->status === 'completed') {
                 $stock = Stock::where('product_id', $item['product_id'])
                     ->where('warehouse_id', $purchase->warehouse_id)
                     ->first();
@@ -296,22 +310,41 @@ public function updateStatus(Request $request, $id)
                     ]);
                 }
             }
-
-            DB::commit();
-
-            return response()->json([
-                'message' => 'Purchase updated successfully',
-                'purchase' => $purchase->load('items'),
-            ]);
-        } catch (\Exception $e) {
-            DB::rollBack();
-
-            return response()->json([
-                'message' => 'Failed to update purchase',
-                'error' => $e->getMessage(),
-            ], 500);
         }
+
+        DB::commit();
+
+        return response()->json([
+            'message' => 'Purchase updated successfully',
+            'purchase' => $purchase->load('items'),
+        ]);
+    } catch (\Exception $e) {
+        DB::rollBack();
+
+        \Log::error('Purchase update failed', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+            'request' => $request->all(),
+        ]);
+
+        return response()->json([
+            'message' => 'Failed to update purchase',
+            'error' => $e->getMessage(),
+        ], 500);
     }
+}
+
+
+
+
+
+
+
+
+
+
+
+
 
     // Delete purchase & reduce stock accordingly
     public function destroy($id)

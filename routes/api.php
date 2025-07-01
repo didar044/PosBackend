@@ -10,6 +10,10 @@ use App\Http\Controllers\Api\Product\ProductController;
 use App\Http\Controllers\Api\Purchase\PurchaseController;
 use App\Http\Controllers\Api\Purchase\PurchaseItemController;
 use App\Http\Controllers\Api\Stock\StockController;
+use App\Http\Controllers\Api\Stock\StocktransferController;
+use App\Http\Controllers\Api\Customer\CustomerController;
+use App\Http\Controllers\Api\Expense\ExpenseCategorieController;
+use App\Http\Controllers\Api\Expense\ExpenseController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -25,4 +29,11 @@ Route::apiResource('purchases', PurchaseController::class);
 Route::apiResource('purchasesitems', PurchaseItemController::class);
 Route::apiResource('stocks', StockController::class);
 Route::put('purchases/{id}/status', [PurchaseController::class, 'updateStatus']);
+Route::apiResource('stocktransfers', StocktransferController::class);
+Route::patch('/stocktransfers/{id}/status', [StocktransferController::class, 'updateStatus']);
+Route::apiResource('customers', CustomerController::class);
+Route::apiResource('expensecategories', ExpenseCategorieController::class);
+Route::apiResource('expenses', ExpenseController::class);
+
+
 
