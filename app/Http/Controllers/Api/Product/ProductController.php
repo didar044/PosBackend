@@ -85,7 +85,7 @@ public function update(Request $request, $id)
         'quantity' => 'required|integer|min:0',
         'status' => 'nullable|in:active,inactive',
         'description' => 'nullable|string',
-        'img' => 'image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+       // 'img' => 'image|mimes:jpeg,png,jpg,gif,svg|max:2048',
        //'img' => 'required',
     ]);
 

@@ -1,21 +1,18 @@
 <?php
 
-namespace App\Http\Controllers\Api\Purchase;
+namespace App\Http\Controllers\Api\Sale;
 
 use App\Http\Controllers\Controller;
-use App\Models\Purchase\PurchaseItem;
 use Illuminate\Http\Request;
 
-
-class PurchaseItemController extends Controller
+class SaleItemController extends Controller
 {
     /**
      * Display a listing of the resource.
      */
     public function index()
     {
-        $purchasesitems = PurchaseItem::with('product')->get();
-        return response()->json($purchasesitems);
+        //
     }
 
     /**

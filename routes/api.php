@@ -14,6 +14,9 @@ use App\Http\Controllers\Api\Stock\StocktransferController;
 use App\Http\Controllers\Api\Customer\CustomerController;
 use App\Http\Controllers\Api\Expense\ExpenseCategorieController;
 use App\Http\Controllers\Api\Expense\ExpenseController;
+use App\Http\Controllers\Api\Sale\SaleController;
+use App\Http\Controllers\Api\Sale\SaleItemController;
+use App\Http\Controllers\Api\DashboardController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -34,6 +37,9 @@ Route::patch('/stocktransfers/{id}/status', [StocktransferController::class, 'up
 Route::apiResource('customers', CustomerController::class);
 Route::apiResource('expensecategories', ExpenseCategorieController::class);
 Route::apiResource('expenses', ExpenseController::class);
-
+Route::apiResource('sales', SaleController::class);
+Route::apiResource('saleitems', SaleItemController::class);
+Route::put('sales/{id}/status', [SaleController::class, 'updateStatus']);
+Route::apiResource('dashboards', DashboardController::class);
 
 

@@ -25,7 +25,7 @@ class Purchase extends Model
         return $this->belongsTo(Warehouse::class);
     }
 
-    // PurchaseItem.php
+    
     public function product() {
         return $this->belongsTo(Product::class);
     }
