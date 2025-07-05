@@ -18,53 +18,73 @@ class SaleController extends Controller
     }
 
     public function store(Request $request)
-    {
-        $request->validate([
-            'customer_id'     => 'nullable|integer',
-            'warehouse_id'    => 'required|integer',
-            'sale_date'       => 'required|date',
-            'total_amount'    => 'required|numeric',
-            'paid_amount'     => 'required|numeric',
-            'payment_method'  => 'required|in:cash,card,mobile,bank',
-            'status'          => 'required|in:pending,completed,cancelled',
-            'items'           => 'required|array|min:1',
-            'items.*.product_id' => 'required|integer',
-            'items.*.quantity'   => 'required|integer',
-            'items.*.unit_price' => 'required|numeric',
-            'items.*.subtotal'   => 'required|numeric',
-        ]);
-
-        DB::beginTransaction();
-
-        try {
-            $sale = Sale::create([
-                'customer_id'    => $request->customer_id,
-                'warehouse_id'   => $request->warehouse_id,
-                'sale_date'      => $request->sale_date,
-                'total_amount'   => $request->total_amount,
-                'paid_amount'    => $request->paid_amount,
-                'payment_method' => $request->payment_method,
-                'status'         => $request->status,
+        {
+            $request->validate([
+                'customer_id'        => 'nullable|integer',
+                'warehouse_id'       => 'required|integer',
+                'sale_date'          => 'required|date',
+                'total_amount'       => 'required|numeric',
+                'paid_amount'        => 'required|numeric',
+                'payment_method'     => 'required|in:cash,card,mobile,bank',
+                'status'             => 'required|in:pending,completed,cancelled',
+                'items'              => 'required|array|min:1',
+                'items.*.product_id' => 'required|integer',
+                'items.*.quantity'   => 'required|integer',
+                'items.*.unit_price' => 'required|numeric',
+                'items.*.subtotal'   => 'required|numeric',
             ]);
 
-            foreach ($request->items as $item) {
-                SaleItem::create([
-                    'sale_id'    => $sale->id,
-                    'product_id' => $item['product_id'],
-                    'quantity'   => $item['quantity'],
-                    'unit_price' => $item['unit_price'],
-                    'subtotal'   => $item['subtotal'],
+            DB::beginTransaction();
+
+            try {
+                $sale = Sale::create([
+                    'customer_id'    => $request->customer_id,
+                    'warehouse_id'   => $request->warehouse_id,
+                    'sale_date'      => $request->sale_date,
+                    'total_amount'   => $request->total_amount,
+                    'paid_amount'    => $request->paid_amount,
+                    'payment_method' => $request->payment_method,
+                    'status'         => $request->status,
                 ]);
+
+                foreach ($request->items as $item) {
+                    SaleItem::create([
+                        'sale_id'    => $sale->id,
+                        'product_id' => $item['product_id'],
+                        'quantity'   => $item['quantity'],
+                        'unit_price' => $item['unit_price'],
+                        'subtotal'   => $item['subtotal'],
+                    ]);
+
+                    // Adjust stock only if sale is completed
+                    if ($request->status === 'completed') {
+                        $stock = Stock::where('product_id', $item['product_id'])
+                                    ->where('warehouse_id', $request->warehouse_id)
+                                    ->lockForUpdate()
+                                    ->first();
+
+                        if (!$stock) {
+                            throw new \Exception("Stock not found for product ID {$item['product_id']} in warehouse ID {$request->warehouse_id}");
+                        }
+
+                        if ($stock->quantity < $item['quantity']) {
+                            throw new \Exception("Insufficient stock for product ID {$item['product_id']}");
+                        }
+
+                        $stock->quantity -= $item['quantity'];
+                        $stock->save();
+                    }
+                }
+
+                DB::commit();
+                return response()->json(['message' => 'Sale created successfully', 'sale_id' => $sale->id], 201);
+
+            } catch (\Exception $e) {
+                DB::rollBack();
+                return response()->json(['error' => 'Failed to create sale', 'details' => $e->getMessage()], 500);
             }
-
-            DB::commit();
-            return response()->json(['message' => 'Sale created successfully', 'sale_id' => $sale->id], 201);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json(['error' => 'Failed to create sale', 'details' => $e->getMessage()], 500);
         }
-    }
+
 
 // SaleController.php
 
